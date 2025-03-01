@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grove's System of Spheres Visualization</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+      .container {
+        display: flex;
+        flex-direction: row;
+        gap: 20px;
+      }
+      .controls {
+        width: 300px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      .visualization {
+        flex-grow: 1;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        position: relative;
+      }
+      canvas {
+        display: block;
+      }
+      label {
+        display: block;
+        margin-top: 10px;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input,
+      select {
+        margin-bottom: 15px;
+        width: 100%;
+      }
+      button {
+        background-color: #4caf50;
+        border: none;
+        color: white;
+        padding: 10px 15px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+      .info-panel {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+      }
+      .proposition {
+        margin-bottom: 10px;
+        padding: 5px;
+        background-color: #e9ecef;
+        border-radius: 3px;
+      }
+      .help-text {
+        margin-top: 15px;
+        font-style: italic;
+        font-size: 0.9em;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Grove's System of Spheres Visualization</h1>
+    <p>
+      Interact with this visualization to understand how Grove's system of
+      spheres models belief revision.
+    </p>
+
+    <div class="container">
+      <div class="controls">
+        <h2>Controls</h2>
+
+        <label for="num-spheres">Number of Spheres:</label>
+        <input type="range" id="num-spheres" min="2" max="7" value="4" />
+
+        <label for="proposition">Define Proposition:</label>
+        <select id="proposition-shape">
+          <option value="circle">Circle</option>
+          <option value="rectangle">Rectangle</option>
+          <option value="polygon">Polygon</option>
+        </select>
+
+        <div id="proposition-params">
+          <!-- Will be populated dynamically -->
+        </div>
+
+        <button id="add-proposition">Add Proposition</button>
+        <button id="clear-propositions">Clear Propositions</button>
+
+        <div class="proposition-list">
+          <h3>Defined Propositions</h3>
+          <div id="propositions"></div>
+        </div>
+
+        <div class="revision-controls">
+          <h3>Revision</h3>
+          <label for="revision-prop">Revise with proposition:</label>
+          <select id="revision-prop">
+            <option value="">Select a proposition</option>
+          </select>
+          <button id="perform-revision">Perform Revision</button>
+          <button id="reset-revision">Reset</button>
+        </div>
+      </div>
+
+      <div class="visualization">
+        <canvas id="canvas" width="600" height="600"></canvas>
+
+        <div class="info-panel">
+          <h3>Information</h3>
+          <div id="info-content">
+            <p>
+              Current theory T is represented by the innermost sphere (|T|).
+            </p>
+            <p>
+              Add propositions and perform revisions to see how Grove's model
+              works.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="help-text">
+      <h3>How to use this visualization:</h3>
+      <ol>
+        <li>
+          Adjust the number of spheres to represent different levels of
+          plausibility
+        </li>
+        <li>Define propositions by selecting a shape and parameters</li>
+        <li>Select a proposition to revise your current theory with</li>
+        <li>
+          Observe how the revision process works according to Grove's model
+        </li>
+      </ol>
+      <p>In Grove's model, when revising theory T with proposition A:</p>
+      <ol>
+        <li>Find c(A), the smallest sphere intersecting |A|</li>
+        <li>Compute fs(A) = |A| ∩ c(A), the "closest" A-worlds</li>
+        <li>
+          The revised theory T+A is t(fs(A)), all sentences true in these worlds
+        </li>
+      </ol>
+    </div>
+
+    <script>
+      // Constants
+      const CANVAS_WIDTH = 600;
+      const CANVAS_HEIGHT = 600;
+      const CENTER_X = CANVAS_WIDTH / 2;
+      const CENTER_Y = CANVAS_HEIGHT / 2;
+      const MAX_RADIUS = Math.min(CENTER_X, CENTER_Y) * 0.9;
+
+      // State
+      let numSpheres = 4;
+      let propositions = [];
+      let selectedProposition = null;
+      let revisionResult = null;
+      let revisionStep = 0; // 0: None, 1: Show c(A), 2: Show fs(A), 3: Show final result
+
+      // Colors
+      const sphereColors = [
+        "rgba(200, 230, 255, 0.5)", // Innermost sphere
+        "rgba(180, 220, 255, 0.4)",
+        "rgba(160, 210, 255, 0.3)",
+        "rgba(140, 200, 255, 0.25)",
+        "rgba(120, 190, 255, 0.2)",
+        "rgba(100, 180, 255, 0.15)",
+        "rgba(80, 170, 255, 0.1)", // Outermost sphere
+      ];
+
+      // Get DOM elements
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const numSpheresInput = document.getElementById("num-spheres");
+      const propositionShapeSelect =
+        document.getElementById("proposition-shape");
+      const propositionParamsDiv =
+        document.getElementById("proposition-params");
+      const addPropositionButton = document.getElementById("add-proposition");
+      const clearPropositionsButton =
+        document.getElementById("clear-propositions");
+      const propositionsList = document.getElementById("propositions");
+      const revisionPropSelect = document.getElementById("revision-prop");
+      const performRevisionButton = document.getElementById("perform-revision");
+      const resetRevisionButton = document.getElementById("reset-revision");
+      const infoContent = document.getElementById("info-content");
+
+      // Initialize
+      function init() {
+        // Set up event listeners
+        numSpheresInput.addEventListener("input", () => {
+          numSpheres = parseInt(numSpheresInput.value);
+          draw();
+        });
+
+        propositionShapeSelect.addEventListener(
+          "change",
+          updatePropositionParams
+        );
+
+        addPropositionButton.addEventListener("click", addProposition);
+        clearPropositionsButton.addEventListener("click", clearPropositions);
+
+        performRevisionButton.addEventListener("click", performRevision);
+        resetRevisionButton.addEventListener("click", resetRevision);
+
+        // Initial setup
+        updatePropositionParams();
+        draw();
+      }
+
+      // Update proposition parameters based on selected shape
+      function updatePropositionParams() {
+        const shape = propositionShapeSelect.value;
+        let html = "";
+
+        html += '<label for="prop-name">Name (e.g., A, B, C):</label>';
+        html +=
+          '<input type="text" id="prop-name" placeholder="A" maxlength="1" required>';
+
+        switch (shape) {
+          case "circle":
+            html += '<label for="prop-x">Center X (0-100):</label>';
+            html +=
+              '<input type="number" id="prop-x" min="0" max="100" value="70">';
+            html += '<label for="prop-y">Center Y (0-100):</label>';
+            html +=
+              '<input type="number" id="prop-y" min="0" max="100" value="50">';
+            html += '<label for="prop-radius">Radius (5-40):</label>';
+            html +=
+              '<input type="number" id="prop-radius" min="5" max="40" value="20">';
+            break;
+
+          case "rectangle":
+            html += '<label for="prop-x">Left (0-100):</label>';
+            html +=
+              '<input type="number" id="prop-x" min="0" max="100" value="60">';
+            html += '<label for="prop-y">Top (0-100):</label>';
+            html +=
+              '<input type="number" id="prop-y" min="0" max="100" value="30">';
+            html += '<label for="prop-width">Width (10-80):</label>';
+            html +=
+              '<input type="number" id="prop-width" min="10" max="80" value="30">';
+            html += '<label for="prop-height">Height (10-80):</label>';
+            html +=
+              '<input type="number" id="prop-height" min="10" max="80" value="40">';
+            break;
+
+          case "polygon":
+            html += "<label>Position (0-100 scale):</label>";
+            html += '<div style="display: flex; gap: 5px;">';
+            html +=
+              '<input type="number" id="prop-x1" placeholder="X1" min="0" max="100" value="50">';
+            html +=
+              '<input type="number" id="prop-y1" placeholder="Y1" min="0" max="100" value="20">';
+            html += "</div>";
+            html += '<div style="display: flex; gap: 5px;">';
+            html +=
+              '<input type="number" id="prop-x2" placeholder="X2" min="0" max="100" value="70">';
+            html +=
+              '<input type="number" id="prop-y2" placeholder="Y2" min="0" max="100" value="50">';
+            html += "</div>";
+            html += '<div style="display: flex; gap: 5px;">';
+            html +=
+              '<input type="number" id="prop-x3" placeholder="X3" min="0" max="100" value="40">';
+            html +=
+              '<input type="number" id="prop-y3" placeholder="Y3" min="0" max="100" value="70">';
+            html += "</div>";
+            break;
+        }
+
+        propositionParamsDiv.innerHTML = html;
+      }
+
+      // Add a new proposition
+      function addProposition() {
+        const nameInput = document.getElementById("prop-name");
+        const name = nameInput.value.trim().toUpperCase();
+
+        if (!name) {
+          alert("Please enter a name for the proposition.");
+          return;
+        }
+
+        // Check for duplicate names
+        if (propositions.some((p) => p.name === name)) {
+          alert(`Proposition "${name}" already exists.`);
+          return;
+        }
+
+        const shape = propositionShapeSelect.value;
+        let proposition = { name, shape, color: getRandomColor() };
+
+        switch (shape) {
+          case "circle":
+            proposition.x =
+              (parseInt(document.getElementById("prop-x").value) / 100) *
+              CANVAS_WIDTH;
+            proposition.y =
+              (parseInt(document.getElementById("prop-y").value) / 100) *
+              CANVAS_HEIGHT;
+            proposition.radius =
+              (parseInt(document.getElementById("prop-radius").value) / 100) *
+              MAX_RADIUS *
+              2;
+            break;
+
+          case "rectangle":
+            proposition.x =
+              (parseInt(document.getElementById("prop-x").value) / 100) *
+              CANVAS_WIDTH;
+            proposition.y =
+              (parseInt(document.getElementById("prop-y").value) / 100) *
+              CANVAS_HEIGHT;
+            proposition.width =
+              (parseInt(document.getElementById("prop-width").value) / 100) *
+              CANVAS_WIDTH;
+            proposition.height =
+              (parseInt(document.getElementById("prop-height").value) / 100) *
+              CANVAS_HEIGHT;
+            break;
+
+          case "polygon":
+            proposition.points = [
+              {
+                x:
+                  (parseInt(document.getElementById("prop-x1").value) / 100) *
+                  CANVAS_WIDTH,
+                y:
+                  (parseInt(document.getElementById("prop-y1").value) / 100) *
+                  CANVAS_HEIGHT,
+              },
+              {
+                x:
+                  (parseInt(document.getElementById("prop-x2").value) / 100) *
+                  CANVAS_WIDTH,
+                y:
+                  (parseInt(document.getElementById("prop-y2").value) / 100) *
+                  CANVAS_HEIGHT,
+              },
+              {
+                x:
+                  (parseInt(document.getElementById("prop-x3").value) / 100) *
+                  CANVAS_WIDTH,
+                y:
+                  (parseInt(document.getElementById("prop-y3").value) / 100) *
+                  CANVAS_HEIGHT,
+              },
+            ];
+            break;
+        }
+
+        propositions.push(proposition);
+        updatePropositionsList();
+        updateRevisionSelect();
+        draw();
+      }
+
+      // Clear all propositions
+      function clearPropositions() {
+        propositions = [];
+        resetRevision();
+        updatePropositionsList();
+        updateRevisionSelect();
+        draw();
+      }
+
+      // Update the list of propositions displayed
+      function updatePropositionsList() {
+        let html = "";
+
+        if (propositions.length === 0) {
+          html = "<p>No propositions defined yet.</p>";
+        } else {
+          propositions.forEach((prop) => {
+            html += `<div class="proposition" style="border-left: 4px solid ${prop.color}">`;
+            html += `<strong>${prop.name}</strong>: ${prop.shape}`;
+            html += "</div>";
+          });
+        }
+
+        propositionsList.innerHTML = html;
+      }
+
+      // Update the revision proposition select dropdown
+      function updateRevisionSelect() {
+        let html = '<option value="">Select a proposition</option>';
+
+        propositions.forEach((prop) => {
+          html += `<option value="${prop.name}">${prop.name}</option>`;
+        });
+
+        revisionPropSelect.innerHTML = html;
+      }
+
+      // Perform revision with selected proposition
+      function performRevision() {
+        const selectedName = revisionPropSelect.value;
+        if (!selectedName) {
+          alert("Please select a proposition to revise with.");
+          return;
+        }
+
+        selectedProposition = propositions.find((p) => p.name === selectedName);
+        revisionStep = 1;
+        calculateRevision();
+        draw();
+        updateInfo();
+      }
+
+      // Calculate the result of revision
+      function calculateRevision() {
+        // Find the smallest sphere that intersects with the proposition
+        let sphereIndex = -1;
+
+        // Check each sphere starting from the innermost
+        for (let i = 0; i < numSpheres; i++) {
+          const sphereRadius = (i + 1) * (MAX_RADIUS / numSpheres);
+          if (doesShapeIntersectSphere(selectedProposition, sphereRadius)) {
+            sphereIndex = i;
+            break;
+          }
+        }
+
+        revisionResult = {
+          proposition: selectedProposition,
+          sphereIndex: sphereIndex,
+        };
+      }
+
+      // Check if a shape intersects with a sphere
+      function doesShapeIntersectSphere(shape, sphereRadius) {
+        switch (shape.shape) {
+          case "circle":
+            // Calculate the distance between circle centers
+            const dx = shape.x - CENTER_X;
+            const dy = shape.y - CENTER_Y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Circle-circle intersection: if distance between centers is <= sum of radii
+            return distance <= sphereRadius + shape.radius;
+
+          case "rectangle":
+            // Check if any corner of the rectangle is inside the sphere
+            const corners = [
+              { x: shape.x, y: shape.y },
+              { x: shape.x + shape.width, y: shape.y },
+              { x: shape.x, y: shape.y + shape.height },
+              { x: shape.x + shape.width, y: shape.y + shape.height },
+            ];
+
+            for (const corner of corners) {
+              const dx = corner.x - CENTER_X;
+              const dy = corner.y - CENTER_Y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              if (distance <= sphereRadius) {
+                return true;
+              }
+            }
+
+            // Also check if the sphere intersects any edge of the rectangle
+            // (Simplified approximation for visualization purposes)
+            const closestX = Math.max(
+              shape.x,
+              Math.min(CENTER_X, shape.x + shape.width)
+            );
+            const closestY = Math.max(
+              shape.y,
+              Math.min(CENTER_Y, shape.y + shape.height)
+            );
+            const rectDx = closestX - CENTER_X;
+            const rectDy = closestY - CENTER_Y;
+            const rectDistance = Math.sqrt(rectDx * rectDx + rectDy * rectDy);
+            return rectDistance <= sphereRadius;
+
+          case "polygon":
+            // Check if any point of the polygon is inside the sphere
+            for (const point of shape.points) {
+              const polyDx = point.x - CENTER_X;
+              const polyDy = point.y - CENTER_Y;
+              const polyDistance = Math.sqrt(polyDx * polyDx + polyDy * polyDy);
+              if (polyDistance <= sphereRadius) {
+                return true;
+              }
+            }
+
+            // For simplicity, we'll use a rough approximation for line-sphere intersections
+            // This isn't perfectly accurate but serves the visualization purpose
+            return false;
+        }
+
+        return false;
+      }
+
+      // Reset the revision process
+      function resetRevision() {
+        selectedProposition = null;
+        revisionResult = null;
+        revisionStep = 0;
+        draw();
+        updateInfo();
+      }
+
+      // Update the information panel
+      function updateInfo() {
+        let html = "";
+
+        if (revisionStep === 0) {
+          html =
+            "<p>Current theory T is represented by the innermost sphere (|T|).</p>";
+          html +=
+            "<p>Add propositions and perform revisions to see how Grove's model works.</p>";
+        } else if (revisionStep === 1) {
+          html = `<p>Revising theory T with proposition ${selectedProposition.name}:</p>`;
+          if (revisionResult.sphereIndex === -1) {
+            html += `<p>No sphere intersects |${selectedProposition.name}|. This proposition contradicts all possible worlds.</p>`;
+          } else {
+            html += `<p>The smallest sphere intersecting |${
+              selectedProposition.name
+            }| is sphere ${revisionResult.sphereIndex + 1}.</p>`;
+            html += `<p>This is c(${selectedProposition.name}) in Grove's notation.</p>`;
+          }
+          html +=
+            '<p><button onclick="nextRevisionStep()">Next: Find f<sub>S</sub>(A)</button></p>';
+        } else if (revisionStep === 2) {
+          html = `<p>Revision of T with ${selectedProposition.name}, step 2:</p>`;
+          html += `<p>f<sub>S</sub>(${selectedProposition.name}) = |${selectedProposition.name}| ∩ c(${selectedProposition.name})</p>`;
+          html += `<p>These are the "closest" ${selectedProposition.name}-worlds to the current theory T.</p>`;
+          html +=
+            '<p><button onclick="nextRevisionStep()">Next: Final Result</button></p>';
+        } else if (revisionStep === 3) {
+          html = `<p>Final result of revising T with ${selectedProposition.name}:</p>`;
+          html += `<p>T+${selectedProposition.name} = t(f<sub>S</sub>(${selectedProposition.name}))</p>`;
+          html += `<p>The revised theory contains all sentences that are true in all worlds in the highlighted area.</p>`;
+        }
+
+        infoContent.innerHTML = html;
+      }
+
+      // Advance to the next revision step
+      function nextRevisionStep() {
+        revisionStep++;
+        draw();
+        updateInfo();
+      }
+
+      // Draw the visualization
+      function draw() {
+        // Clear canvas
+        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+        // Draw spheres from outside to inside
+        for (let i = numSpheres - 1; i >= 0; i--) {
+          const radius = (i + 1) * (MAX_RADIUS / numSpheres);
+          ctx.beginPath();
+          ctx.arc(CENTER_X, CENTER_Y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = sphereColors[i];
+          ctx.fill();
+          ctx.strokeStyle = "rgba(100, 100, 100, 0.3)";
+          ctx.stroke();
+        }
+
+        // Draw all propositions
+        propositions.forEach((prop) => {
+          drawProposition(prop);
+        });
+
+        // Draw revision highlights
+        if (revisionStep > 0 && revisionResult) {
+          // Highlight the smallest sphere intersecting the proposition
+          if (revisionResult.sphereIndex >= 0) {
+            const radius =
+              (revisionResult.sphereIndex + 1) * (MAX_RADIUS / numSpheres);
+            ctx.beginPath();
+            ctx.arc(CENTER_X, CENTER_Y, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(255, 100, 100, 0.8)";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.lineWidth = 1;
+
+            if (revisionStep >= 2) {
+              // Highlight the intersection area
+              ctx.save();
+
+              // Clip to the sphere
+              ctx.beginPath();
+              ctx.arc(CENTER_X, CENTER_Y, radius, 0, Math.PI * 2);
+              ctx.clip();
+
+              // Draw the proposition with a highlight
+              drawProposition(selectedProposition, true);
+
+              ctx.restore();
+            }
+          }
+        }
+
+        // Draw labels
+        ctx.fillStyle = "black";
+        ctx.font = "14px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("|T|", CENTER_X, CENTER_Y);
+
+        // Label for sphere if showing revision
+        if (
+          revisionStep === 1 &&
+          revisionResult &&
+          revisionResult.sphereIndex >= 0
+        ) {
+          const radius =
+            (revisionResult.sphereIndex + 1) * (MAX_RADIUS / numSpheres);
+          ctx.fillText(
+            `c(${selectedProposition.name})`,
+            CENTER_X,
+            CENTER_Y - radius - 10
+          );
+        }
+
+        if (
+          revisionStep >= 2 &&
+          revisionResult &&
+          revisionResult.sphereIndex >= 0
+        ) {
+          const radius =
+            (revisionResult.sphereIndex + 1) * (MAX_RADIUS / numSpheres);
+          ctx.fillText(
+            `f(${selectedProposition.name}) = |${selectedProposition.name}| ∩ c(${selectedProposition.name})`,
+            CENTER_X,
+            CENTER_Y - radius - 10
+          );
+        }
+      }
+
+      // Draw a proposition
+      function drawProposition(prop, highlight = false) {
+        ctx.fillStyle = highlight ? "rgba(255, 255, 0, 0.5)" : prop.color;
+        ctx.strokeStyle = highlight
+          ? "rgba(255, 100, 0, 0.8)"
+          : "rgba(0, 0, 0, 0.8)";
+        ctx.lineWidth = highlight ? 2 : 1;
+
+        switch (prop.shape) {
+          case "circle":
+            ctx.beginPath();
+            ctx.arc(prop.x, prop.y, prop.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Label
+            ctx.fillStyle = "black";
+            ctx.font = "16px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(prop.name, prop.x, prop.y);
+            break;
+
+          case "rectangle":
+            ctx.beginPath();
+            ctx.rect(prop.x, prop.y, prop.width, prop.height);
+            ctx.fill();
+            ctx.stroke();
+
+            // Label
+            ctx.fillStyle = "black";
+            ctx.font = "16px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(
+              prop.name,
+              prop.x + prop.width / 2,
+              prop.y + prop.height / 2
+            );
+            break;
+
+          case "polygon":
+            ctx.beginPath();
+            ctx.moveTo(prop.points[0].x, prop.points[0].y);
+            for (let i = 1; i < prop.points.length; i++) {
+              ctx.lineTo(prop.points[i].x, prop.points[i].y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Calculate centroid for label
+            let centroidX = 0,
+              centroidY = 0;
+            for (const point of prop.points) {
+              centroidX += point.x;
+              centroidY += point.y;
+            }
+            centroidX /= prop.points.length;
+            centroidY /= prop.points.length;
+
+            // Label
+            ctx.fillStyle = "black";
+            ctx.font = "16px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(prop.name, centroidX, centroidY);
+            break;
+        }
+      }
+
+      // Get a random color
+      function getRandomColor() {
+        const hue = Math.floor(Math.random() * 360);
+        return `hsla(${hue}, 70%, 70%, 0.7)`;
+      }
+
+      // Initialize when the page loads
+      window.onload = init;
+    </script>
+  </body>
+</html>
