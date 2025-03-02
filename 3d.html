@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grove's 3D System of Spheres Visualization</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+      }
+      #info {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        color: white;
+        background-color: rgba(0, 0, 0, 0.7);
+        padding: 15px;
+        border-radius: 5px;
+        max-width: 300px;
+        z-index: 100;
+      }
+      #controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        color: white;
+        background-color: rgba(0, 0, 0, 0.7);
+        padding: 15px;
+        border-radius: 5px;
+        max-width: 300px;
+        max-height: 80vh; /* Set maximum height to 80% of viewport height */
+        overflow-y: auto; /* Add vertical scrollbar when content overflows */
+        z-index: 100;
+      }
+      #controls label {
+        display: block;
+        margin-top: 10px;
+        margin-bottom: 5px;
+      }
+      #controls input,
+      #controls select,
+      #controls button {
+        width: 100%;
+        margin-bottom: 10px;
+        padding: 5px;
+      }
+      #controls button {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+      #controls button:hover {
+        background-color: #45a049;
+      }
+      .proposition-item {
+        margin: 5px 0;
+        padding: 5px;
+        background-color: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="info">
+      <h2>Grove's 3D System of Spheres</h2>
+      <p>This visualization demonstrates Grove's model for belief revision.</p>
+      <p>
+        The nested spheres represent different plausibility levels, with the
+        innermost sphere being the current theory T.
+      </p>
+      <div id="info-content">
+        <p>
+          Add propositions and perform revisions to see the model in action.
+        </p>
+      </div>
+    </div>
+
+    <div id="controls">
+      <h3>Controls</h3>
+
+      <label for="num-spheres">Number of Spheres:</label>
+      <input type="range" id="num-spheres" min="2" max="7" value="4" />
+
+      <label for="sphere-opacity">Sphere Opacity:</label>
+      <input
+        type="range"
+        id="sphere-opacity"
+        min="0.1"
+        max="0.9"
+        value="0.3"
+        step="0.1"
+      />
+
+      <h3>Add Proposition</h3>
+      <select id="prop-shape">
+        <option value="sphere">Sphere</option>
+        <option value="cube">Cube</option>
+        <option value="cylinder">Cylinder</option>
+      </select>
+
+      <label for="prop-name">Proposition Name:</label>
+      <input type="text" id="prop-name" placeholder="A" maxlength="1" />
+
+      <div id="shape-params"></div>
+
+      <button id="add-prop">Add Proposition</button>
+      <button id="clear-props">Clear Propositions</button>
+
+      <h3>Revision</h3>
+      <select id="revision-prop">
+        <option value="">Select a proposition</option>
+      </select>
+      <button id="perform-revision">Perform Revision</button>
+      <button id="reset-revision">Reset</button>
+
+      <h3>Propositions</h3>
+      <div id="prop-list"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <script>
+      // Scene setup
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x121212);
+
+      // Font loader
+      /*const fontLoader = new THREE.FontLoader();
+      let defaultFont = null;
+
+      // Load a font
+      fontLoader.load(
+        "https://threejs.org/examples/fonts/helvetiker_regular.typeface.json",
+        function (font) {
+          defaultFont = font;
+          createSpheres();
+        },
+        undefined,
+        function (error) {
+          console.error("Font loading failed:", error);
+          // Fall back to spheres without text
+          createSpheres();
+        }
+      );*/
+
+      // Camera setup
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.set(0, 5, 15);
+
+      // Add this to the info panel to show help with navigation
+      const infoContent = document.getElementById("info-content");
+      infoContent.innerHTML += `
+  <p>Navigation: 
+    <ul>
+      <li>Left click + drag to rotate</li>
+      <li>Scroll to zoom in/out</li>
+      <li>Right click + drag to pan</li>
+    </ul>
+  </p>
+`;
+
+      // Renderer setup
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // Controls setup
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.25;
+      controls.enableZoom = true;
+      controls.minDistance = 3;
+      controls.maxDistance = 20;
+      controls.target.set(0, 0, 0);
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(1, 1, 1);
+      scene.add(directionalLight);
+
+      // Grid helper
+      const gridHelper = new THREE.GridHelper(20, 20);
+      scene.add(gridHelper);
+
+      // State
+      let numSpheres = 4;
+      let sphereOpacity = 0.3;
+      let spheres = [];
+      let propositions = [];
+      let selectedProposition = null;
+      let revisionResult = null;
+      let revisionStep = 0;
+      let highlightedArea = null;
+
+      // Colors
+      const sphereColors = [
+        0x8ecdf8, // Innermost sphere
+        0x7abef5,
+        0x66b0f3,
+        0x52a2f0,
+        0x3e94ee,
+        0x2a86eb,
+        0x1678e9, // Outermost sphere
+      ];
+
+      // Initialize sphere visualization
+      function createSpheres() {
+        // Remove existing spheres
+        spheres.forEach((sphere) => scene.remove(sphere));
+        spheres = [];
+
+        // Maximum radius
+        const maxRadius = 5;
+
+        // Create new spheres from outside to inside
+        for (let i = numSpheres - 1; i >= 0; i--) {
+          const radius = (i + 1) * (maxRadius / numSpheres);
+          const sphereGeometry = new THREE.SphereGeometry(radius, 32, 32);
+          const sphereMaterial = new THREE.MeshPhongMaterial({
+            color: sphereColors[i],
+            transparent: true,
+            opacity: sphereOpacity,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          });
+
+          const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+          scene.add(sphere);
+          spheres.push(sphere);
+        }
+        // Add a simple marker at the center instead of text
+        const centerMarker = new THREE.Mesh(
+          new THREE.SphereGeometry(0.2, 16, 16),
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        scene.add(centerMarker);
+
+        /* if (defaultFont) {
+          // Add theory label (T) at the center
+          const labelGeometry = new THREE.TextBufferGeometry("T", {
+            font: new THREE.Font(), // In a real implementation, you'd need to load a font
+            size: 0.3,
+            height: 0.05,
+          });
+          const labelMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+          });
+          const label = new THREE.Mesh(labelGeometry, labelMaterial);
+          label.position.set(-0.15, -0.15, 0);
+          scene.add(label);
+        }*/
+      }
+
+      // Update shape parameters based on selected shape
+      function updateShapeParams() {
+        const shape = document.getElementById("prop-shape").value;
+        let html = "";
+
+        switch (shape) {
+          case "sphere":
+            html += '<label for="sphere-x">X Position (-5 to 5):</label>';
+            html +=
+              '<input type="range" id="sphere-x" min="-5" max="5" value="2" step="0.5" />';
+            html += '<label for="sphere-y">Y Position (-5 to 5):</label>';
+            html +=
+              '<input type="range" id="sphere-y" min="-5" max="5" value="2" step="0.5" />';
+            html += '<label for="sphere-z">Z Position (-5 to 5):</label>';
+            html +=
+              '<input type="range" id="sphere-z" min="-5" max="5" value="0" step="0.5" />';
+            html += '<label for="sphere-radius">Radius (0.5 to 2):</label>';
+            html +=
+              '<input type="range" id="sphere-radius" min="0.5" max="2" value="1" step="0.1" />';
+            break;
+
+          case "cube":
+            html += '<label for="cube-x">X Position (-5 to 5):</label>';
+            html +=
+              '<input type="range" id="cube-x" min="-5" max="5" value="2" step="0.5" />';
+            html += '<label for="cube-y">Y Position (-5 to 5):</label>';
+            html +=
+              '<input type="range" id="cube-y" min="-5" max="5" value="2" step="0.5" />';
+            html += '<label for="cube-z">Z Position (-5 to 5):</label>';
+            html +=
+              '<input type="range" id="cube-z" min="-5" max="5" value="0" step="0.5" />';
+            html += '<label for="cube-size">Size (0.5 to 2):</label>';
+            html +=
+              '<input type="range" id="cube-size" min="0.5" max="2" value="1" step="0.1" />';
+            break;
+
+          case "cylinder":
+            html += '<label for="cylinder-x">X Position (-5 to 5):</label>';
+            html +=
+              '<input type="range" id="cylinder-x" min="-5" max="5" value="2" step="0.5" />';
+            html += '<label for="cylinder-y">Y Position (-5 to 5):</label>';
+            html +=
+              '<input type="range" id="cylinder-y" min="-5" max="5" value="2" step="0.5" />';
+            html += '<label for="cylinder-z">Z Position (-5 to 5):</label>';
+            html +=
+              '<input type="range" id="cylinder-z" min="-5" max="5" value="0" step="0.5" />';
+            html += '<label for="cylinder-radius">Radius (0.3 to 1.5):</label>';
+            html +=
+              '<input type="range" id="cylinder-radius" min="0.3" max="1.5" value="0.7" step="0.1" />';
+            html += '<label for="cylinder-height">Height (0.5 to 3):</label>';
+            html +=
+              '<input type="range" id="cylinder-height" min="0.5" max="3" value="1.5" step="0.1" />';
+            break;
+        }
+
+        document.getElementById("shape-params").innerHTML = html;
+      }
+
+      // Add proposition
+      function addProposition() {
+        const nameInput = document
+          .getElementById("prop-name")
+          .value.trim()
+          .toUpperCase();
+        if (!nameInput) {
+          alert("Please enter a name for the proposition");
+          return;
+        }
+
+        // Check for duplicates
+        if (propositions.some((p) => p.name === nameInput)) {
+          alert(`Proposition "${nameInput}" already exists`);
+          return;
+        }
+
+        const shape = document.getElementById("prop-shape").value;
+        const color = getRandomColor();
+        const prop = { name: nameInput, shape, color, object: null };
+
+        switch (shape) {
+          case "sphere":
+            const sphereX = parseFloat(
+              document.getElementById("sphere-x").value
+            );
+            const sphereY = parseFloat(
+              document.getElementById("sphere-y").value
+            );
+            const sphereZ = parseFloat(
+              document.getElementById("sphere-z").value
+            );
+            const sphereRadius = parseFloat(
+              document.getElementById("sphere-radius").value
+            );
+
+            const sphereGeometry = new THREE.SphereGeometry(
+              sphereRadius,
+              32,
+              32
+            );
+            const sphereMaterial = new THREE.MeshPhongMaterial({
+              color: color,
+              transparent: true,
+              opacity: 0.7,
+            });
+
+            const sphereObj = new THREE.Mesh(sphereGeometry, sphereMaterial);
+            sphereObj.position.set(sphereX, sphereY, sphereZ);
+            scene.add(sphereObj);
+
+            prop.object = sphereObj;
+            prop.params = {
+              x: sphereX,
+              y: sphereY,
+              z: sphereZ,
+              radius: sphereRadius,
+            };
+            break;
+
+          case "cube":
+            const cubeX = parseFloat(document.getElementById("cube-x").value);
+            const cubeY = parseFloat(document.getElementById("cube-y").value);
+            const cubeZ = parseFloat(document.getElementById("cube-z").value);
+            const cubeSize = parseFloat(
+              document.getElementById("cube-size").value
+            );
+
+            const cubeGeometry = new THREE.BoxGeometry(
+              cubeSize,
+              cubeSize,
+              cubeSize
+            );
+            const cubeMaterial = new THREE.MeshPhongMaterial({
+              color: color,
+              transparent: true,
+              opacity: 0.7,
+            });
+
+            const cubeObj = new THREE.Mesh(cubeGeometry, cubeMaterial);
+            cubeObj.position.set(cubeX, cubeY, cubeZ);
+            scene.add(cubeObj);
+
+            prop.object = cubeObj;
+            prop.params = { x: cubeX, y: cubeY, z: cubeZ, size: cubeSize };
+            break;
+
+          case "cylinder":
+            const cylinderX = parseFloat(
+              document.getElementById("cylinder-x").value
+            );
+            const cylinderY = parseFloat(
+              document.getElementById("cylinder-y").value
+            );
+            const cylinderZ = parseFloat(
+              document.getElementById("cylinder-z").value
+            );
+            const cylinderRadius = parseFloat(
+              document.getElementById("cylinder-radius").value
+            );
+            const cylinderHeight = parseFloat(
+              document.getElementById("cylinder-height").value
+            );
+
+            const cylinderGeometry = new THREE.CylinderGeometry(
+              cylinderRadius,
+              cylinderRadius,
+              cylinderHeight,
+              32
+            );
+            const cylinderMaterial = new THREE.MeshPhongMaterial({
+              color: color,
+              transparent: true,
+              opacity: 0.7,
+            });
+
+            const cylinderObj = new THREE.Mesh(
+              cylinderGeometry,
+              cylinderMaterial
+            );
+            cylinderObj.position.set(cylinderX, cylinderY, cylinderZ);
+            scene.add(cylinderObj);
+
+            prop.object = cylinderObj;
+            prop.params = {
+              x: cylinderX,
+              y: cylinderY,
+              z: cylinderZ,
+              radius: cylinderRadius,
+              height: cylinderHeight,
+            };
+            break;
+        }
+
+        // In the addProposition function, replace the text label creation part with:
+
+        // Add a marker instead of text
+        // Replace the marker creation code in addProposition function with this:
+
+        // Add a visible marker with the proposition letter
+        const markerGeometry = new THREE.SphereGeometry(0.25, 16, 16); // Make it larger
+        const markerMaterial = new THREE.MeshBasicMaterial({
+          color: 0x000000, // White color will be more visible
+          transparent: true,
+          opacity: 0.9,
+        });
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+
+        // Position the marker slightly offset from the center to make it visible
+        switch (shape) {
+          case "sphere":
+            marker.position.set(
+              prop.params.x, // Small offset in x direction
+              prop.params.y, // Position above the sphere
+              prop.params.z
+            );
+            break;
+          case "cube":
+            marker.position.set(
+              prop.params.x,
+              prop.params.y, // Position above the cube
+              prop.params.z
+            );
+            break;
+          case "cylinder":
+            marker.position.set(
+              prop.params.x,
+              prop.params.y, // Position above the cylinder
+              prop.params.z
+            );
+            break;
+        }
+
+        scene.add(marker);
+        prop.label = marker;
+
+        // Add name as text sprite for better visibility
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        canvas.width = 128;
+        canvas.height = 128;
+        context.font = "bold 80px Arial";
+        context.fillStyle = "#ffffff";
+        context.textAlign = "center";
+        context.fillText(prop.name, 64, 96);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+        });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(1, 1, 1);
+        sprite.position.copy(marker.position);
+        scene.add(sprite);
+        prop.nameSprite = sprite;
+        /*
+        // Add a text label
+        // In a real implementation, you'd need to load a font
+        const labelGeometry = new THREE.TextBufferGeometry(nameInput, {
+          font: new THREE.Font(),
+          size: 0.3,
+          height: 0.05,
+        });
+        const labelMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const label = new THREE.Mesh(labelGeometry, labelMaterial);
+
+        // Position the label next to the object
+        switch (shape) {
+          case "sphere":
+            label.position.set(
+              prop.params.x + prop.params.radius * 0.7,
+              prop.params.y + prop.params.radius * 0.7,
+              prop.params.z
+            );
+            break;
+          case "cube":
+            label.position.set(
+              prop.params.x + prop.params.size * 0.7,
+              prop.params.y + prop.params.size * 0.7,
+              prop.params.z
+            );
+            break;
+          case "cylinder":
+            label.position.set(
+              prop.params.x + prop.params.radius * 0.7,
+              prop.params.y + prop.params.height * 0.7,
+              prop.params.z
+            );
+            break;
+        }
+
+        scene.add(label);
+        prop.label = label;*/
+
+        propositions.push(prop);
+        updatePropositionList();
+        updateRevisionSelect();
+      }
+
+      // Clear all propositions
+      function clearPropositions() {
+        propositions.forEach((prop) => {
+          scene.remove(prop.object);
+          if (prop.label) scene.remove(prop.label);
+        });
+
+        propositions = [];
+        resetRevision();
+        updatePropositionList();
+        updateRevisionSelect();
+      }
+
+      // Update proposition list display
+      function updatePropositionList() {
+        const list = document.getElementById("prop-list");
+
+        if (propositions.length === 0) {
+          list.innerHTML = "<p>No propositions defined</p>";
+          return;
+        }
+
+        let html = "";
+        propositions.forEach((prop) => {
+          html += `<div class="proposition-item" style="border-left: 3px solid #${prop.color
+            .toString(16)
+            .padStart(6, "0")}">`;
+          html += `${prop.name}: ${prop.shape}`;
+          html += "</div>";
+        });
+
+        list.innerHTML = html;
+      }
+
+      // Update revision proposition select
+      function updateRevisionSelect() {
+        const select = document.getElementById("revision-prop");
+
+        let html = '<option value="">Select a proposition</option>';
+        propositions.forEach((prop) => {
+          html += `<option value="${prop.name}">${prop.name}</option>`;
+        });
+
+        select.innerHTML = html;
+      }
+
+      // Perform revision with selected proposition
+      function performRevision() {
+        const selectedName = document.getElementById("revision-prop").value;
+        if (!selectedName) {
+          alert("Please select a proposition to revise with");
+          return;
+        }
+
+        selectedProposition = propositions.find((p) => p.name === selectedName);
+        revisionStep = 1;
+        calculateRevision();
+        updateInfo();
+
+        // Highlight the revision visually
+        highlightRevision();
+      }
+
+      // Calculate revision result
+      function calculateRevision() {
+        // Find the smallest sphere intersecting the proposition
+        const maxRadius = 5;
+        let sphereIndex = -1;
+
+        // Check each sphere starting from innermost
+        for (let i = 0; i < numSpheres; i++) {
+          const sphereRadius = (i + 1) * (maxRadius / numSpheres);
+          if (doesShapeIntersectSphere(selectedProposition, sphereRadius)) {
+            sphereIndex = i;
+            break;
+          }
+        }
+
+        revisionResult = {
+          proposition: selectedProposition,
+          sphereIndex: sphereIndex,
+        };
+      }
+
+      // Check if a shape intersects with a sphere of given radius
+      function doesShapeIntersectSphere(prop, sphereRadius) {
+        const pos = prop.object.position;
+        const distanceFromCenter = Math.sqrt(
+          pos.x * pos.x + pos.y * pos.y + pos.z * pos.z
+        );
+
+        switch (prop.shape) {
+          case "sphere":
+            // Sphere-sphere intersection: if distance <= sum of radii
+            return distanceFromCenter <= sphereRadius + prop.params.radius;
+
+          case "cube":
+            // Simplified cube-sphere intersection
+            // Check if any corner of the cube is inside the sphere
+            const halfSize = prop.params.size / 2;
+            const corners = [
+              { x: pos.x + halfSize, y: pos.y + halfSize, z: pos.z + halfSize },
+              { x: pos.x + halfSize, y: pos.y + halfSize, z: pos.z - halfSize },
+              { x: pos.x + halfSize, y: pos.y - halfSize, z: pos.z + halfSize },
+              { x: pos.x + halfSize, y: pos.y - halfSize, z: pos.z - halfSize },
+              { x: pos.x - halfSize, y: pos.y + halfSize, z: pos.z + halfSize },
+              { x: pos.x - halfSize, y: pos.y + halfSize, z: pos.z - halfSize },
+              { x: pos.x - halfSize, y: pos.y - halfSize, z: pos.z + halfSize },
+              { x: pos.x - halfSize, y: pos.y - halfSize, z: pos.z - halfSize },
+            ];
+
+            for (const corner of corners) {
+              const distance = Math.sqrt(
+                corner.x * corner.x + corner.y * corner.y + corner.z * corner.z
+              );
+              if (distance <= sphereRadius) {
+                return true;
+              }
+            }
+
+            // Also check if center of cube is close enough to sphere
+            return (
+              distanceFromCenter <=
+              sphereRadius + Math.sqrt(3 * halfSize * halfSize)
+            );
+
+          case "cylinder":
+            // Simplified cylinder-sphere intersection
+            // Check if either end cap center is inside sphere
+            const halfHeight = prop.params.height / 2;
+            const topCenter = {
+              x: pos.x,
+              y: pos.y + halfHeight,
+              z: pos.z,
+            };
+            const bottomCenter = {
+              x: pos.x,
+              y: pos.y - halfHeight,
+              z: pos.z,
+            };
+
+            const topDist = Math.sqrt(
+              topCenter.x * topCenter.x +
+                topCenter.y * topCenter.y +
+                topCenter.z * topCenter.z
+            );
+
+            const bottomDist = Math.sqrt(
+              bottomCenter.x * bottomCenter.x +
+                bottomCenter.y * bottomCenter.y +
+                bottomCenter.z * bottomCenter.z
+            );
+
+            if (topDist <= sphereRadius || bottomDist <= sphereRadius) {
+              return true;
+            }
+
+            // Check if cylinder's central axis is close enough to the origin
+            // This is a simplification - a more accurate check would be more complex
+            const projDistance = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
+            return projDistance <= sphereRadius + prop.params.radius;
+        }
+
+        return false;
+      }
+
+      // Highlight the revision process visually
+      function highlightRevision() {
+        // Remove any existing highlight
+        if (highlightedArea) {
+          scene.remove(highlightedArea);
+          highlightedArea = null;
+        }
+
+        if (revisionResult.sphereIndex >= 0) {
+          const maxRadius = 5;
+          const sphereRadius =
+            (revisionResult.sphereIndex + 1) * (maxRadius / numSpheres);
+
+          // Create a wireframe sphere to highlight c(A)
+          const highlightGeometry = new THREE.SphereGeometry(
+            sphereRadius,
+            32,
+            32
+          );
+          const highlightMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff5555,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.7,
+          });
+
+          highlightedArea = new THREE.Mesh(
+            highlightGeometry,
+            highlightMaterial
+          );
+          scene.add(highlightedArea);
+
+          // Highlight the proposition
+          const propObj = selectedProposition.object;
+          const originalMaterial = propObj.material;
+
+          // Create a glowing effect
+          propObj.material = new THREE.MeshPhongMaterial({
+            color: selectedProposition.color,
+            emissive: 0xffff00,
+            emissiveIntensity: 0.5,
+            transparent: true,
+            opacity: 0.9,
+          });
+
+          // Restore the original material after a delay
+          setTimeout(() => {
+            if (propObj) propObj.material = originalMaterial;
+          }, 3000);
+        }
+      }
+
+      // Reset revision
+      function resetRevision() {
+        selectedProposition = null;
+        revisionResult = null;
+        revisionStep = 0;
+
+        if (highlightedArea) {
+          scene.remove(highlightedArea);
+          highlightedArea = null;
+        }
+
+        updateInfo();
+      }
+
+      // Update information panel
+      function updateInfo() {
+        const infoContent = document.getElementById("info-content");
+
+        if (revisionStep === 0) {
+          infoContent.innerHTML = `
+                    <p>Current theory T is represented by the innermost sphere.</p>
+                    <p>Add propositions and perform revisions to see Grove's model in action.</p>
+                `;
+        } else if (revisionStep === 1) {
+          if (revisionResult.sphereIndex === -1) {
+            infoContent.innerHTML = `
+                        <p>Revising theory T with proposition ${selectedProposition.name}:</p>
+                        <p>No sphere intersects with ${selectedProposition.name}. 
+                        This proposition contradicts all possible worlds.</p>
+                    `;
+          } else {
+            infoContent.innerHTML = `
+                        <p>Revising theory T with proposition ${
+                          selectedProposition.name
+                        }:</p>
+                        <p>The smallest sphere intersecting ${
+                          selectedProposition.name
+                        } 
+                        is sphere ${revisionResult.sphereIndex + 1}.</p>
+                        <p>This is c(${
+                          selectedProposition.name
+                        }) in Grove's notation.</p>
+                        <p>The revised theory T+${
+                          selectedProposition.name
+                        } is the intersection of 
+                        ${selectedProposition.name} with this sphere.</p>
+                    `;
+          }
+        }
+      }
+
+      // Get a random color
+      function getRandomColor() {
+        return Math.floor(Math.random() * 0xffffff);
+      }
+
+      // Event listeners
+      document
+        .getElementById("num-spheres")
+        .addEventListener("input", function () {
+          numSpheres = parseInt(this.value);
+          createSpheres();
+        });
+
+      document
+        .getElementById("sphere-opacity")
+        .addEventListener("input", function () {
+          sphereOpacity = parseFloat(this.value);
+          createSpheres();
+        });
+
+      document
+        .getElementById("prop-shape")
+        .addEventListener("change", updateShapeParams);
+      document
+        .getElementById("add-prop")
+        .addEventListener("click", addProposition);
+      document
+        .getElementById("clear-props")
+        .addEventListener("click", clearPropositions);
+      document
+        .getElementById("perform-revision")
+        .addEventListener("click", performRevision);
+      document
+        .getElementById("reset-revision")
+        .addEventListener("click", resetRevision);
+
+      // Handle window resize
+      window.addEventListener("resize", function () {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // Animation loop
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      // Initialize
+      updateShapeParams();
+      createSpheres();
+      animate();
+    </script>
+  </body>
+</html>

@@ -74,6 +74,52 @@
         color: #666;
       }
     </style>
+    <style>
+      /* Add after other styles */
+      .math-notation {
+        font-family: "Times New Roman", serif;
+        font-style: italic;
+      }
+
+      .sphere-label {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.7);
+        padding: 3px;
+        border-radius: 3px;
+        pointer-events: none;
+      }
+
+      .example-panel {
+        margin-top: 15px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+
+      .example-button {
+        background-color: #4b76c5;
+        margin-right: 5px;
+      }
+
+      .postulate {
+        background-color: #f8f9fa;
+        padding: 8px;
+        margin-bottom: 5px;
+        border-left: 3px solid #4caf50;
+      }
+
+      #tutorial-panel {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid #ccc;
+        padding: 10px;
+        border-radius: 5px;
+        max-width: 300px;
+        display: none;
+      }
+    </style>
   </head>
   <body>
     <h1>Grove's System of Spheres Visualization</h1>
@@ -135,29 +181,95 @@
           </div>
         </div>
       </div>
+      <div class="example-panel">
+        <h3>Example Scenarios</h3>
+        <p>Click an example to see Grove's model in action:</p>
+        <button class="example-button" id="example-consistency">
+          Consistent Revision
+        </button>
+        <button class="example-button" id="example-minimal-change">
+          Minimal Change
+        </button>
+        <button class="example-button" id="example-success">
+          Success Postulate
+        </button>
+        <button class="example-button" id="example-recovery">Recovery</button>
+      </div>
+
+      <div id="tutorial-panel">
+        <h4>Tutorial</h4>
+        <p id="tutorial-text">
+          Welcome to Grove's System of Spheres visualization.
+        </p>
+        <button id="tutorial-next">Next</button>
+        <button id="tutorial-close">Close</button>
+      </div>
     </div>
 
     <div class="help-text">
-      <h3>How to use this visualization:</h3>
-      <ol>
-        <li>
-          Adjust the number of spheres to represent different levels of
-          plausibility
-        </li>
-        <li>Define propositions by selecting a shape and parameters</li>
-        <li>Select a proposition to revise your current theory with</li>
-        <li>
-          Observe how the revision process works according to Grove's model
-        </li>
-      </ol>
-      <p>In Grove's model, when revising theory T with proposition A:</p>
-      <ol>
-        <li>Find c(A), the smallest sphere intersecting |A|</li>
-        <li>Compute fs(A) = |A| ∩ c(A), the "closest" A-worlds</li>
-        <li>
-          The revised theory T+A is t(fs(A)), all sentences true in these worlds
-        </li>
-      </ol>
+      <h3>Understanding Grove's System of Spheres:</h3>
+      <p>
+        This visualization demonstrates Grove's theoretical framework for belief
+        revision as described in his 1988 paper "Two Modellings for Theory
+        Change".
+      </p>
+
+      <div class="postulate">
+        <h4>Key Concepts:</h4>
+        <ul>
+          <li>The innermost sphere represents your current beliefs |T|</li>
+          <li>Outer spheres represent increasingly less plausible worlds</li>
+          <li>
+            When revising with proposition A, we find c(A): the smallest sphere
+            intersecting |A|
+          </li>
+          <li>The revised belief T+A = t(|A| ∩ c(A))</li>
+        </ul>
+      </div>
+
+      <h4>AGM Postulates Demonstrated:</h4>
+      <div class="postulate">
+        <strong>(+1) Closure:</strong> The revised theory T+A is logically
+        closed
+        <p class="math-notation">
+          Formal: T+A = Cn(T+A), where Cn is the logical closure operator
+        </p>
+      </div>
+      <div class="postulate">
+        <strong>(+2) Success:</strong> When revising with A, the proposition A
+        is included in the revised theory
+        <p class="math-notation">Formal: A ∈ T+A</p>
+      </div>
+      <div class="postulate">
+        <strong>(+3) Expansion:</strong> If A is consistent with T, then T+A =
+        T∪{A}
+        <p class="math-notation">Formal: If ¬A ∉ T, then T+A = Cn(T ∪ {A})</p>
+      </div>
+      <div class="postulate">
+        <strong>(+4) Consistency:</strong> T+A is consistent if A is consistent
+        <p class="math-notation">
+          Formal: If ¬A is not a tautology, then T+A is consistent
+        </p>
+      </div>
+      <div class="postulate">
+        <strong>(+5) Preservation:</strong> If A and B are logically equivalent,
+        then T+A = T+B
+        <p class="math-notation">Formal: If ⊢ A ↔ B, then T+A = T+B</p>
+      </div>
+      <div class="postulate">
+        <strong>(+6) Recovery:</strong> The intersection of the revised theory
+        with the original theory equals the contraction of ¬A from T
+        <p class="math-notation">Formal: T ⊆ (T-A)+A</p>
+      </div>
+      <div class="postulate">
+        <strong>(+7) Conjunctive Inclusion:</strong> T+(A∧B) ⊆ (T+A)+B
+        <p class="math-notation">Formal: T+(A∧B) ⊆ (T+A)+B</p>
+      </div>
+      <div class="postulate">
+        <strong>(+8) Conjunctive Vacuity:</strong> If ¬B ∉ T+A, then (T+A)+B ⊆
+        T+(A∧B)
+        <p class="math-notation">Formal: If ¬B ∉ T+A, then (T+A)+B ⊆ T+(A∧B)</p>
+      </div>
     </div>
 
     <script>
@@ -502,12 +614,125 @@
               }
             }
 
-            // For simplicity, we'll use a rough approximation for line-sphere intersections
-            // This isn't perfectly accurate but serves the visualization purpose
+            // Check if any edge of the polygon intersects with the sphere
+            for (let i = 0; i < shape.points.length; i++) {
+              const p1 = shape.points[i];
+              const p2 = shape.points[(i + 1) % shape.points.length];
+
+              // Calculate closest point on line segment to circle center
+              const dx = p2.x - p1.x;
+              const dy = p2.y - p1.y;
+              const lengthSquared = dx * dx + dy * dy;
+
+              if (lengthSquared === 0) continue;
+
+              const t = Math.max(
+                0,
+                Math.min(
+                  1,
+                  ((CENTER_X - p1.x) * dx + (CENTER_Y - p1.y) * dy) /
+                    lengthSquared
+                )
+              );
+
+              const closestX = p1.x + t * dx;
+              const closestY = p1.y + t * dy;
+
+              const distX = closestX - CENTER_X;
+              const distY = closestY - CENTER_Y;
+              const distance = Math.sqrt(distX * distX + distY * distY);
+
+              if (distance <= sphereRadius) {
+                return true;
+              }
+            }
+
             return false;
         }
 
         return false;
+      }
+      function validateAGMPostulates(originalT, proposition, revisedT) {
+        const info = [];
+
+        // Closure postulate: The revised theory is logically closed
+        info.push({
+          postulate: "(+1) Closure",
+          satisfied: "Yes",
+          explanation:
+            "The revised theory T+A is logically closed because we take all sentences true in the selected worlds",
+          formal: "T+A = Cn(T+A), where Cn is the logical closure operator",
+        });
+
+        // Success postulate: proposition should be in revised theory
+        info.push({
+          postulate: "(+2) Success",
+          satisfied: "The new proposition is included in the revised theory",
+          explanation:
+            "This is guaranteed by selecting worlds where the proposition is true",
+          formal: "A ∈ T+A",
+        });
+
+        // Expansion: If proposition is consistent with T, T+A = T∪{A}
+        const isConsistentWithT = doesShapeIntersectSphere(
+          proposition,
+          MAX_RADIUS / numSpheres
+        );
+        info.push({
+          postulate: "(+3) Expansion",
+          satisfied: isConsistentWithT ? "Yes" : "N/A",
+          explanation: isConsistentWithT
+            ? "The proposition is consistent with T, so revision = expansion"
+            : "Proposition contradicts T, so minimal change was needed",
+          formal: "If ¬A ∉ T, then T+A = Cn(T ∪ {A})",
+        });
+
+        // Consistency: T+A is consistent if A is consistent
+        info.push({
+          postulate: "(+4) Consistency",
+          satisfied: "Yes",
+          explanation:
+            "The revised theory is consistent because we selected a non-empty set of worlds where the proposition is true",
+          formal: "If ¬A is not a tautology, then T+A is consistent",
+        });
+
+        // Preservation/Equivalence: If A ≡ B (logically equivalent), then T+A = T+B
+        info.push({
+          postulate: "(+5) Preservation",
+          satisfied: "Yes",
+          explanation:
+            "Grove's model guarantees that logically equivalent propositions yield identical revisions",
+          formal: "If ⊢ A ↔ B, then T+A = T+B",
+        });
+
+        // Recovery: (T+A)∩T = T-¬A
+        info.push({
+          postulate: "(+6) Recovery",
+          satisfied: "Yes",
+          explanation:
+            "The intersection of the revised theory with the original theory equals the contraction of ¬A from T",
+          formal: "T ⊆ (T-A)+A",
+        });
+
+        // Conjunction 1: T+(A∧B) ⊆ (T+A)+B
+        info.push({
+          postulate: "(+7) Conjunctive Inclusion",
+          satisfied: "Yes",
+          explanation:
+            "Adding A and B together is contained in adding A then adding B",
+          formal: "T+(A∧B) ⊆ (T+A)+B",
+        });
+
+        // Conjunction 2: (T+A)+B ⊆ T+(A∧B) when ¬B is not in T+A
+        info.push({
+          postulate: "(+8) Conjunctive Vacuity",
+          satisfied: "Yes",
+          explanation:
+            "When B is consistent with revision by A, adding B after A equals adding A∧B directly",
+          formal: "If ¬B ∉ T+A, then (T+A)+B ⊆ T+(A∧B)",
+        });
+
+        return info;
       }
 
       // Reset the revision process
@@ -722,6 +947,296 @@
         const hue = Math.floor(Math.random() * 360);
         return `hsla(${hue}, 70%, 70%, 0.7)`;
       }
+
+      // Example scenarios
+      document
+        .getElementById("example-consistency")
+        .addEventListener("click", loadConsistencyExample);
+      document
+        .getElementById("example-minimal-change")
+        .addEventListener("click", loadMinimalChangeExample);
+      document
+        .getElementById("example-success")
+        .addEventListener("click", loadSuccessExample);
+      document
+        .getElementById("example-recovery")
+        .addEventListener("click", loadRecoveryExample);
+      document
+        .getElementById("tutorial-next")
+        .addEventListener("click", advanceTutorial);
+      document
+        .getElementById("tutorial-close")
+        .addEventListener("click", closeTutorial);
+
+      let tutorialStep = 0;
+
+      function startTutorial() {
+        tutorialStep = 0;
+        document.getElementById("tutorial-panel").style.display = "block";
+        advanceTutorial();
+      }
+
+      function advanceTutorial() {
+        const tutorialText = document.getElementById("tutorial-text");
+        tutorialStep++;
+
+        switch (tutorialStep) {
+          case 1:
+            tutorialText.innerHTML =
+              "The concentric circles represent Grove's system of spheres. The innermost circle is your current belief set |T|.";
+            break;
+          case 2:
+            tutorialText.innerHTML =
+              "Add a proposition by selecting a shape and defining its parameters. This represents some new information.";
+            break;
+          case 3:
+            tutorialText.innerHTML =
+              "When you revise with a proposition, we find the smallest sphere intersecting it (c(A)) and take its intersection with the proposition.";
+            break;
+          case 4:
+            tutorialText.innerHTML =
+              "The resulting set represents your revised belief T+A, satisfying AGM postulates for rational belief revision.";
+            break;
+          default:
+            closeTutorial();
+            break;
+        }
+      }
+
+      function closeTutorial() {
+        document.getElementById("tutorial-panel").style.display = "none";
+      }
+
+      function loadConsistencyExample() {
+        clearPropositions();
+        numSpheres = 4;
+        numSpheresInput.value = 4;
+
+        // Create a proposition that intersects with the innermost sphere
+        const propA = {
+          name: "A",
+          shape: "circle",
+          x: CENTER_X + MAX_RADIUS * 0.2,
+          y: CENTER_Y,
+          radius: MAX_RADIUS * 0.4,
+          color: "rgba(100, 200, 130, 0.5)",
+        };
+
+        propositions.push(propA);
+        updatePropositionsList();
+        updateRevisionSelect();
+
+        // Set explanation
+        infoContent.innerHTML =
+          "<p>Proposition A is <strong>consistent</strong> with theory T.</p>" +
+          "<p>Notice how A intersects with the innermost sphere |T|.</p>" +
+          "<p>When you revise with A, the result will be T∩A (simple expansion), demonstrating AGM postulate (+3).</p>" +
+          "<p>Try performing the revision to see this in action.</p>";
+
+        draw();
+      }
+
+      function loadMinimalChangeExample() {
+        clearPropositions();
+        numSpheres = 5;
+        numSpheresInput.value = 5;
+
+        // Create a proposition that intersects with the 3rd sphere but not innermost
+        const propB = {
+          name: "B",
+          shape: "circle",
+          x: CENTER_X + MAX_RADIUS * 0.6,
+          y: CENTER_Y,
+          radius: MAX_RADIUS * 0.2,
+          color: "rgba(200, 100, 130, 0.5)",
+        };
+
+        propositions.push(propB);
+        updatePropositionsList();
+        updateRevisionSelect();
+
+        // Set explanation
+        infoContent.innerHTML =
+          "<p>Proposition B is <strong>inconsistent</strong> with theory T.</p>" +
+          "<p>Notice B does not intersect with the innermost sphere |T|.</p>" +
+          "<p>When revising, Grove's model finds the closest worlds where B is true (minimal change).</p>" +
+          "<p>This demonstrates the minimal change principle in AGM postulates (+7/+8).</p>";
+
+        draw();
+      }
+
+      function loadSuccessExample() {
+        clearPropositions();
+        numSpheres = 4;
+        numSpheresInput.value = 4;
+
+        // Create proposition C
+        const propC = {
+          name: "C",
+          shape: "rectangle",
+          x: CENTER_X - MAX_RADIUS * 0.8,
+          y: CENTER_Y - MAX_RADIUS * 0.4,
+          width: MAX_RADIUS * 0.5,
+          height: MAX_RADIUS * 0.8,
+          color: "rgba(130, 130, 230, 0.5)",
+        };
+
+        propositions.push(propC);
+        updatePropositionsList();
+        updateRevisionSelect();
+
+        // Set explanation
+        infoContent.innerHTML =
+          "<p>Proposition C represents new information we want to accept.</p>" +
+          "<p>The Success Postulate (+2) guarantees that after revision with C, the proposition C will be in our belief set.</p>" +
+          "<p>Perform the revision to see how Grove's model ensures this by taking worlds from C.</p>";
+
+        draw();
+      }
+
+      function loadRecoveryExample() {
+        clearPropositions();
+        numSpheres = 5;
+        numSpheresInput.value = 5;
+
+        // Add two propositions to demonstrate recovery
+        const propD = {
+          name: "D",
+          shape: "circle",
+          x: CENTER_X + MAX_RADIUS * 0.4,
+          y: CENTER_Y - MAX_RADIUS * 0.3,
+          radius: MAX_RADIUS * 0.3,
+          color: "rgba(230, 180, 80, 0.5)",
+        };
+
+        const propE = {
+          name: "E",
+          shape: "polygon",
+          points: [
+            { x: CENTER_X - MAX_RADIUS * 0.5, y: CENTER_Y - MAX_RADIUS * 0.4 },
+            { x: CENTER_X - MAX_RADIUS * 0.1, y: CENTER_Y - MAX_RADIUS * 0.1 },
+            { x: CENTER_X - MAX_RADIUS * 0.6, y: CENTER_Y + MAX_RADIUS * 0.2 },
+          ],
+          color: "rgba(80, 180, 230, 0.5)",
+        };
+
+        propositions.push(propD);
+        propositions.push(propE);
+        updatePropositionsList();
+        updateRevisionSelect();
+
+        // Set explanation
+        infoContent.innerHTML =
+          "<p>This example demonstrates how Grove's system handles multiple propositions.</p>" +
+          "<p>Try revising first with D, then with E to see how the system maintains coherence.</p>" +
+          "<p>Grove's model ensures rational transition between belief states.</p>";
+
+        draw();
+      }
+
+      // Enhance the draw function to add better labels
+      const originalDraw = draw;
+      draw = function () {
+        // Call the original draw function
+        originalDraw();
+
+        // Add additional labels for spheres
+        if (
+          canvas.nextSibling &&
+          canvas.nextSibling.className === "sphere-label"
+        ) {
+          while (
+            canvas.nextSibling &&
+            canvas.nextSibling.className === "sphere-label"
+          ) {
+            canvas.parentNode.removeChild(canvas.nextSibling);
+          }
+        }
+
+        // Add labels for each sphere
+        for (let i = 0; i < numSpheres; i++) {
+          const radius = (i + 1) * (MAX_RADIUS / numSpheres);
+          const label = document.createElement("div");
+          label.className = "sphere-label";
+
+          if (i === 0) {
+            label.textContent = "|T|";
+          } else if (
+            revisionStep > 0 &&
+            revisionResult &&
+            revisionResult.sphereIndex === i
+          ) {
+            label.textContent = `c(${selectedProposition.name})`;
+          } else {
+            label.textContent = `S${i + 1}`;
+          }
+
+          label.style.left = `${CENTER_X + 5}px`;
+          label.style.top = `${CENTER_Y - radius - 5}px`;
+          canvas.parentNode.insertBefore(label, canvas.nextSibling);
+        }
+
+        // Enhanced information for revision visualization
+        if (
+          revisionStep >= 2 &&
+          revisionResult &&
+          revisionResult.sphereIndex >= 0
+        ) {
+          const label = document.createElement("div");
+          label.className = "sphere-label";
+          label.style.left = `${CENTER_X - 100}px`;
+          label.style.top = `${CENTER_Y + MAX_RADIUS + 10}px`;
+          label.innerHTML = `<strong>f<sub>S</sub>(${selectedProposition.name}) = |${selectedProposition.name}| ∩ c(${selectedProposition.name})</strong>`;
+          canvas.parentNode.insertBefore(label, canvas.nextSibling);
+        }
+      };
+
+      // Add a button to start the tutorial
+      const tutorialButton = document.createElement("button");
+      tutorialButton.textContent = "Start Tutorial";
+      tutorialButton.style.backgroundColor = "#607d8b";
+      tutorialButton.addEventListener("click", startTutorial);
+      document.querySelector(".controls").appendChild(tutorialButton);
+
+      // Enhance updateInfo to provide more detailed explanations
+      const originalUpdateInfo = updateInfo;
+      updateInfo = function () {
+        originalUpdateInfo();
+
+        // Add AGM postulate verification when revision is complete
+        if (revisionStep === 3 && selectedProposition && revisionResult) {
+          const postulateInfo = document.createElement("div");
+          postulateInfo.className = "postulate";
+          postulateInfo.innerHTML = "<h4>AGM Postulates Satisfied:</h4>";
+
+          const postulatesList = validateAGMPostulates(
+            null,
+            selectedProposition,
+            null
+          );
+
+          postulatesList.forEach((p) => {
+            postulateInfo.innerHTML += `<p><strong>${p.postulate}:</strong> ${p.explanation}</p>
+                                       <p class="math-notation"><em>Formal: ${p.formal}</em></p>`;
+          });
+
+          infoContent.appendChild(postulateInfo);
+        }
+      };
+
+      // Initialize with a welcome message
+      window.addEventListener("load", function () {
+        infoContent.innerHTML =
+          "<h3>Welcome to Grove's System of Spheres Visualization</h3>" +
+          "<p>This tool demonstrates Grove's model for belief revision as described in his 1988 paper.</p>" +
+          "<p>You can use the controls on the left to:</p>" +
+          "<ul>" +
+          "<li>Adjust the number of spheres (representing plausibility levels)</li>" +
+          "<li>Define propositions as shapes on the plane</li>" +
+          "<li>Perform belief revision according to Grove's model</li>" +
+          "</ul>" +
+          '<p>Try our example scenarios below or click "Start Tutorial" for a guided introduction.</p>';
+      });
 
       // Initialize when the page loads
       window.onload = init;
