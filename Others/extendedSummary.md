@@ -105,6 +105,26 @@ Grove proves this approach is equivalent to the systems of spheres model, showin
 - (+5) follows from the logical equivalence of A and B
 - (+7) and (+8) follow from the nested structure of spheres and properties of intersection
 
+> Regarding Postulate (+1) - Closure
+>
+> In the AGM framework, postulate (+1) is the Closure postulate:
+>
+> - (+1) T+A is a logically closed theory
+>
+> This postulate is implicitly built into Grove's framework. On page 158, Grove defines a theory T as "any set L ⊆ T ⊆ F which is closed under modus ponens." His revision function T+A always produces a theory by construction, specifically as t(fs(A)), where t() is defined to produce theories.
+>
+> The function fs(A) selects a set of worlds, and t() converts this to a theory (which is closed by definition). Therefore, (+1) is automatically satisfied by the mathematical structures Grove uses, making it unnecessary to list it as a separate postulate to prove.
+
+> Regarding Postulate (+6) - Recovery
+>
+> The standard AGM postulate (+6) is the Recovery postulate:
+>
+> - (+6) T ⊆ (T-A)+A
+>
+> Grove focuses primarily on the revision operation (+) rather than contraction (-), and specifically notes on page 158 that he's following the numbering from the original AGM paper.
+>
+> Looking at Grove's conclusion section (page 167), he does discuss contraction, but approaches it differently than through the recovery postulate. Instead, he shows the equivalence between his models and AGM's partial meet contraction, demonstrating that they produce the same results without explicitly verifying recovery.
+
 ### Theorem 2
 
 **Statement**: For any revision function satisfying AGM postulates (+2) to (+8), there exists a system of spheres S centered on |T| such that T+A = t(fs(A)) for all A.
@@ -225,6 +245,43 @@ Grove shows that special cases in his framework correspond to different AGM cont
 3. **Partial meet contraction**: In AGM, intersection of some selected maximal subsets
    - In Grove's model: Intermediate systems of spheres with finer gradations
    - This provides flexible degrees of belief change
+
+### Detailed Explanation of Contraction in Grove's Framework
+
+While Grove's paper primarily focuses on revision (T+A), Section 4 provides important insights into how contraction (T-A) can be understood within his models. Contraction is the operation of removing a belief A from theory T while maintaining consistency and minimizing information loss.
+
+#### The Correspondence Between Contraction and Possible Worlds
+
+Grove establishes a crucial bijection that connects AGM's syntactic approach with his semantic model:
+
+1. For any sentence A where A ∈ T and A ∉ L, there's a one-to-one correspondence between:
+
+   - Elements of M(T,A) - maximal subsets of T not implying A
+   - Elements of |¬A| - possible worlds where ¬A is true
+
+2. Specifically, for each world u in |¬A|, the corresponding maximal subset is represented by |T| ∪ {u}:
+   - This is the "smallest possible change" to |T| to ensure the theory doesn't imply A
+   - We expand |T| just enough to include one world where A is false
+3. This bijection shows that selecting preferred maximal subsets in AGM's approach is equivalent to selecting preferred "closest" ¬A-worlds in Grove's model
+
+#### How Contraction Works in Grove's Model
+
+When contracting A from T (where A ∈ T and A ∉ L):
+
+1. Identify |¬A| - the worlds where A is false
+2. According to the sphere system, determine which of these worlds are "closest" to |T|
+3. The contracted theory T-A corresponds to expanding |T| to include these closest ¬A-worlds
+
+This elegantly satisfies the principle of minimal change: we expand |T| just enough to stop implying A.
+
+#### Relation to AGM's Selection Function
+
+AGM's approach uses a "selection function" γ to pick preferred maximal subsets from M(T,A). Grove shows this function directly corresponds to his sphere model's identification of closest worlds:
+
+- The selection function γ(M(T,A)) picks the "best" maximal subsets of T not implying A
+- In Grove's model, this corresponds to selecting the closest worlds in |¬A| according to the system of spheres
+
+This equivalence demonstrates that both approaches formalize the same intuition about rational belief contraction through different mathematical frameworks - one syntactic and one semantic.
 
 ### Equivalence Proof in Section 4
 
