@@ -31,7 +31,7 @@ A system of spheres S centered on a set X of possible worlds must satisfy:
 Imagine concentric circles representing degrees of plausibility:
 
 - The innermost sphere contains worlds compatible with current beliefs
-- Moving outward corresponds to increasingly implausible worlds
+- Moving outward corresponds to increasingly implausible worlds.
 - When new information A arrives, we find the closest A-worlds to our current beliefs
 
 This can be interpreted as a similarity ordering where worlds closer to the center are more similar to what we currently believe is the case.
@@ -105,7 +105,7 @@ Grove proves this approach is equivalent to the systems of spheres model, showin
 - (+5) follows from the logical equivalence of A and B
 - (+7) and (+8) follow from the nested structure of spheres and properties of intersection
 
-> Regarding Postulate (+1) - Closure
+> **Regarding Postulate (+1) - Closure**
 >
 > In the AGM framework, postulate (+1) is the Closure postulate:
 >
@@ -115,7 +115,7 @@ Grove proves this approach is equivalent to the systems of spheres model, showin
 >
 > The function fs(A) selects a set of worlds, and t() converts this to a theory (which is closed by definition). Therefore, (+1) is automatically satisfied by the mathematical structures Grove uses, making it unnecessary to list it as a separate postulate to prove.
 
-> Regarding Postulate (+6) - Recovery
+> **Regarding Postulate (+6) - Recovery**
 >
 > The standard AGM postulate (+6) is the Recovery postulate:
 >
